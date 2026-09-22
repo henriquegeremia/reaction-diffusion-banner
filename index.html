@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reaction-Diffusion Interactive Banner | Karl Sims Model</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- HERO / BANNER SECTION WITH WEBGL SIMULATION -->
+  <header class="hero-banner">
+    <!-- WebGL Canvas for reaction-diffusion -->
+    <canvas id="rdCanvas"></canvas>
+
+    <!-- Overlay ambient vignette & scanline -->
+    <div class="banner-overlay"></div>
+
+    <!-- Hero Content -->
+    <div class="hero-content">
+      <div class="badge-pill">
+        <span class="pulse-dot"></span>
+        <span>Gray-Scott Reaction-Diffusion • WebGL 60FPS</span>
+      </div>
+      <h1 class="hero-title">
+        Emergência &amp; Morfogênese
+      </h1>
+      <p class="hero-subtitle">
+        Padrões orgânicos de Alan Turing e Karl Sims simulados em tempo real na GPU. 
+        Mova o cursor ou clique para semear novas reações químicas virtuais.
+      </p>
+
+      <div class="hero-actions">
+        <button id="btnSeedCenter" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          Semear Centro
+        </button>
+        <button id="btnRandomize" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Perturbação Randômica
+        </button>
+      </div>
+
+      <!-- Live Parameter Indicators -->
+      <div class="telemetry-bar">
+        <div class="telemetry-item">
+          <span class="label">Feed Rate (F)</span>
+          <span id="dispF" class="value">0.0545</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="label">Kill Rate (k)</span>
+          <span id="dispK" class="value">0.0620</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="label">Diff A / Diff B</span>
+          <span class="value">1.0 / 0.5</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="label">Iterações / Frame</span>
+          <span id="dispSpeed" class="value">16x</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Floating Control Drawer -->
+    <aside class="control-panel" id="controlPanel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+          <span>Controles da Simulação</span>
+        </div>
+        <button id="btnTogglePanel" class="btn-icon" title="Minimizar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="panel-body">
+        <!-- Presets -->
+        <div class="control-group">
+          <label for="presetSelect">Padrões Karl Sims:</label>
+          <select id="presetSelect" class="form-select">
+            <option value="coral">Coral / Labirinto (F=0.0545, k=0.0620)</option>
+            <option value="mitosis">Mitose / Divisão Celular (F=0.0367, k=0.0649)</option>
+            <option value="solitons">Solitons / Pulsos (F=0.0300, k=0.0620)</option>
+            <option value="waves">Ondas Espirais (F=0.0140, k=0.0540)</option>
+            <option value="spots">Manchas de Leopardo (F=0.0400, k=0.0600)</option>
+            <option value="chaos">Caos Dinâmico (F=0.0260, k=0.0550)</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+
+        <!-- Palettes -->
+        <div class="control-group">
+          <label for="paletteSelect">Paleta Cromática:</label>
+          <select id="paletteSelect" class="form-select">
+            <option value="0">Cyan / Neon Bioluminescente</option>
+            <option value="1">Cyberpunk Violet / Sunset</option>
+            <option value="2">Esmeralda Deep Sea</option>
+            <option value="3">Monocromático Editorial (B&amp;W)</option>
+            <option value="4">Magma Elétrico</option>
+          </select>
+        </div>
+
+        <!-- Sliders -->
+        <div class="control-group">
+          <div class="slider-header">
+            <span>Feed Rate (F)</span>
+            <span id="sliderValF" class="mono">0.0545</span>
+          </div>
+          <input type="range" id="sliderF" min="0.0100" max="0.0900" step="0.0005" value="0.0545">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <span>Kill Rate (k)</span>
+            <span id="sliderValK" class="mono">0.0620</span>
+          </div>
+          <input type="range" id="sliderK" min="0.0450" max="0.0700" step="0.0005" value="0.0620">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <span>Velocidade de Cálculo</span>
+            <span id="sliderValSpeed" class="mono">16x</span>
+          </div>
+          <input type="range" id="sliderSpeed" min="4" max="32" step="2" value="16">
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <span>Raio do Pincel (Mouse)</span>
+            <span id="sliderValBrush" class="mono">16px</span>
+          </div>
+          <input type="range" id="sliderBrush" min="6" max="40" step="2" value="16">
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="panel-buttons">
+          <button id="btnPause" class="btn btn-sm btn-outline">
+            <span id="pauseText">Pausar</span>
+          </button>
+          <button id="btnClear" class="btn btn-sm btn-outline">
+            Limpar Tela
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Scroll Indicator -->
+    <a href="#about" class="scroll-hint">
+      <span>Conheça a Matemática</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+    </a>
+  </header>
+
+  <!-- CONTENT SECTION EXPLAINING REACTION-DIFFUSION -->
+  <main id="about" class="main-content">
+    <div class="container">
+      <div class="section-badge">Morfogênese Computacional</div>
+      <h2 class="section-title">Como Funciona o Modelo Gray-Scott</h2>
+      <p class="section-lead">
+        Em 1952, Alan Turing publicou <em>"The Chemical Basis of Morphogenesis"</em>, teorizando que dois componentes químicos que reagem e se difundem podem espontaneamente quebrar a simetria e criar manchas, listras e padrões orgânicos na natureza.
+      </p>
+
+      <div class="card-grid">
+        <div class="feature-card">
+          <div class="card-icon">⚗️</div>
+          <h3>Dois Reagentes Químicos</h3>
+          <p>
+            O espaço é preenchido com o reagente <strong>A</strong> em estado estável (1.0). Ao introduzir o reagente <strong>B</strong>, a reação autocatalítica consome A: duas moléculas de B combinam com uma de A para produzir três moléculas de B ($A + 2B \rightarrow 3B$).
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon">⚡</div>
+          <h3>Alimentação e Decaimento</h3>
+          <p>
+            O parâmetro <strong>Feed ($F$)</strong> reabastece continuamente a substância A, enquanto o parâmetro <strong>Kill ($k$)</strong> remove gradativamente a substância B, equilibrando a sobrevida dos organismos virtuais.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="card-icon">🌐</div>
+          <h3>Aceleração WebGL por GPU</h3>
+          <p>
+            Esta página executa o cálculo matricial (Laplaciano com convolução 3x3) diretamente nos fragment shaders da sua placa de vídeo usando <em>Ping-Pong Framebuffers</em>, processando milhões de células simultâneas a 60 quadros por segundo.
+          </p>
+        </div>
+      </div>
+
+      <div class="formula-box">
+        <div class="formula-title">As Equações Diferenciais de Gray-Scott:</div>
+        <div class="formula-code">
+          $$\frac{\partial A}{\partial t} = D_A \nabla^2 A - A B^2 + F(1 - A)$$
+          $$\frac{\partial B}{\partial t} = D_B \nabla^2 B + A B^2 - (F + k)B$$
+        </div>
+        <p class="formula-desc">
+          Onde $D_A = 1.0$ e $D_B = 0.5$ são as taxas de difusão, $\nabla^2$ é o operador Laplaciano de vizinhança, $F$ é a taxa de alimentação e $k$ é a taxa de extinção.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Baseado no trabalho seminal de <a href="https://www.karlsims.com/rd.html" target="_blank" rel="noopener">Karl Sims (Reaction-Diffusion Tutorial)</a> e Alan Turing.</p>
+    </div>
+  </footer>
+
+  <script src="sim.js"></script>
+</body>
+</html>
