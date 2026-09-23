@@ -476,7 +476,7 @@
     }
 
     initPingPong(simWidth, simHeight);
-    seedTexture(1); // Seed multiple clusters
+    seedTexture(2); // Iniciar por padrão com perturbação randômica
   }
 
   window.addEventListener('resize', resize);
@@ -585,6 +585,9 @@
     const iters = simParams.speed;
     const brushNorm = simParams.brushRadius / Math.min(canvas.width, canvas.height);
 
+    // Auto-perturbação periódica e orgânica após estabilização
+    handleAutoPerturbation();
+
     for (let i = 0; i < iters; i++) {
       const readIdx = currentRead;
       const writeIdx = 1 - currentRead;
@@ -596,9 +599,12 @@
       gl.bindTexture(gl.TEXTURE_2D, textures[readIdx]);
       gl.uniform1i(simLoc.state, 0);
 
-      // Mouse brush on first substep (only when mouse is clicked/dragging or touch active)
-      if (i === 0 && mouse.down) {
-        gl.uniform3f(simLoc.brush, mouse.x, mouse.y, brushNorm);
+      // Mouse brush or auto-pulse brush on first substep
+      if (i === 0 && (mouse.down || autoPulse.active)) {
+        const bx = mouse.down ? mouse.x : autoPulse.x;
+        const by = mouse.down ? mouse.y : autoPulse.y;
+        const br = mouse.down ? brushNorm : autoPulse.radius;
+        gl.uniform3f(simLoc.brush, bx, by, br);
       } else {
         gl.uniform3f(simLoc.brush, 0.0, 0.0, -1.0);
       }
@@ -609,6 +615,53 @@
 
     if (!mouse.down) {
       mouse.hovering = false;
+    }
+  }
+
+  // Sistema de Auto-Perturbação Orgânica
+  // Quando o usuário não interage e o padrão atinge estabilidade morfológica,
+  // injeta pequenas perturbações químicas pontuais para gerar novos brotos de crescimento
+  let lastUserActivity = Date.now();
+  let lastAutoPulseTime = Date.now();
+  const autoPulse = {
+    active: false,
+    x: 0.5,
+    y: 0.5,
+    radius: 0.03,
+    framesLeft: 0
+  };
+
+  function registerUserActivity() {
+    lastUserActivity = Date.now();
+  }
+
+  window.addEventListener('mousemove', registerUserActivity);
+  window.addEventListener('mousedown', registerUserActivity);
+  window.addEventListener('touchstart', registerUserActivity);
+
+  function handleAutoPerturbation() {
+    const now = Date.now();
+    // Se o pulso atual estiver ativo, decrescer duração (dura 2-3 frames para semear de forma suave)
+    if (autoPulse.active) {
+      autoPulse.framesLeft--;
+      if (autoPulse.framesLeft <= 0) {
+        autoPulse.active = false;
+      }
+      return;
+    }
+
+    // Intervalo de pulso automático: a cada 9 a 15 segundos de calmaria
+    const timeSinceLastPulse = now - lastAutoPulseTime;
+    const timeSinceUser = now - lastUserActivity;
+
+    if (timeSinceUser > 5000 && timeSinceLastPulse > 9000 + Math.random() * 6000) {
+      lastAutoPulseTime = now;
+      // Ponto aleatório bem distribuído, evitando apenas as bordas extremas
+      autoPulse.x = 0.15 + Math.random() * 0.70;
+      autoPulse.y = 0.15 + Math.random() * 0.70;
+      autoPulse.radius = 0.02 + Math.random() * 0.025; // raio sutil e orgânico
+      autoPulse.framesLeft = 2; // dura 2 frames de simulação
+      autoPulse.active = true;
     }
   }
 
@@ -641,7 +694,7 @@
   // Init
   resize();
   syncUI();
-  seedTexture(1);
+  seedTexture(2); // Inicia por padrão com perturbação randômica
   requestAnimationFrame(frame);
 
 })();
